@@ -1,0 +1,2 @@
+a-loam-noted-master
+-DCATKIN_DEVEL_PREFIX=/home/ren/catkin_ws/catkin_aloam/devel -DCMAKE_INSTALL_PREFIX=/home/ren/catkin_ws/catkin_aloam/install -G Unix Makefiles
