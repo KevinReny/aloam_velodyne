@@ -32,6 +32,8 @@ public:
     std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> polarCor; //极坐标系坐标容器
     std::unordered_map<int, std::vector<int>> voxelMap{};//体素滤波后的map
     std::vector<std::pair<int, segInfo>> labelRecords;
+    void labelAnalysis(std::vector<int> &label_info);
+    bool colorSegmentation();
     double minPitch{0.0}; //动态体素的参数设置   [-15°，15°]
     double maxPitch{0.0}; //动态体素的参数设置   [-15°，15°]
     double minPolar{5.0}; //动态体素的参数设置
@@ -49,16 +51,16 @@ public:
     std::vector<double> polarBounds{};//存储点云中的极径
     std::vector<int> labelInfo{};//标签信息，每个标签是一个聚类
 
-    void searchKNN(
+    void searchKNN(//寻找最近邻的体素
             int& polar_index,
             int& pitch_index,
             int& azimuth_index,
             std::vector<int>& out_neighIndex
     ) const;
 
-    bool createHashTable();
-    int getPolarIndex(double &radius);
-    void convertToPolar(pcl::PointCloud<pcl::PointXYZ> &cloud_in_);
+    bool createHashTable();//哈希表的创建
+    int getPolarIndex(double &radius);//获取极坐标索引
+    void convertToPolar(pcl::PointCloud<pcl::PointXYZ> &cloud_in_);//（笛卡尔坐标-> 极坐标）
 
 private:
 

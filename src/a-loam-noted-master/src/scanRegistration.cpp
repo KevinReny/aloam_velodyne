@@ -374,6 +374,87 @@ bool DCVC_Relative ::DCVC(std::vector<int> &label_info) {
     //至此所有的标签都打上了
     // free memory
     std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>().swap(polarCor);
+    return true;
+}
+
+void DCVC_Relative::labelAnalysis(std::vector<int> &label_info) {
+
+    std::unordered_map<int, segInfo> histCounts;//直方图统计
+    size_t totalSize = label_info.size();
+    for (size_t i = 0; i < totalSize; ++i){
+        if (histCounts.find(label_info[i]) == histCounts.end()){//如果当前找到的是新标签  就初始化
+            histCounts[label_info[i]].label = 1;
+            histCounts[label_info[i]].index.emplace_back(i);
+        }else{//否则自增
+            histCounts[label_info[i]].label += 1;
+            histCounts[label_info[i]].index.emplace_back(i);
+        }
+    }
+//最后所有非空体素的信息都存到了histCounts这个vector容器里
+    std::vector<std::pair<int, segInfo>> labelStatic(histCounts.begin(), histCounts.end());//复制了一个vector  不同于map，将类别按照从小到大排列
+    std::sort(labelStatic.begin(), labelStatic.end(), [&](std::pair<int, segInfo>& a, std::pair<int, segInfo>& b)->bool{
+        return a.second.label > b.second.label;
+    });
+
+    auto count{1};
+    for (auto& info : labelStatic){
+        if (info.second.label > minSeg){//如果该类别的点数量足够多  就可以记录  否则剔除   删掉那些小类别点
+            labelRecords.emplace_back(std::make_pair(count, info.second));
+            count++;
+        }
+    }
+    size_t temp = histCounts.size();
+
+    // free memory
+    std::unordered_map<int, segInfo>().swap(histCounts);
+    temp = histCounts.size();
+    std::vector<std::pair<int, segInfo>>().swap(labelStatic);
+}
+
+bool DCVC_Relative::colorSegmentation() {
+    for (auto& label : labelRecords){
+        // box
+        jsk_recognition_msgs::BoundingBox box;
+        double min_x = std::numeric_limits<double>::max();//变量初始化
+        double max_x = -std::numeric_limits<double>::max();
+        double min_y = std::numeric_limits<double>::max();
+        double max_y = -std::numeric_limits<double>::max();
+        double min_z = std::numeric_limits<double>::max();
+        double max_z = -std::numeric_limits<double>::max();
+
+        for (auto& id : label.second.index){//获取
+            segmented_scan.cloud_ptr->points_.emplace_back(object_scan.cloud_ptr->points_[id]);
+            segmented_scan.cloud_ptr->intensity_.emplace_back(object_scan.cloud_ptr->intensity_[id]);
+            //更新最大最小值
+            min_x = std::min(min_x, object_scan.cloud_ptr->points_[id].x());
+            max_x = std::max(max_x, object_scan.cloud_ptr->points_[id].x());
+            min_y = std::min(min_y, object_scan.cloud_ptr->points_[id].y());
+            max_y = std::max(max_y, object_scan.cloud_ptr->points_[id].y());
+            min_z = std::min(min_z, object_scan.cloud_ptr->points_[id].z());
+            max_z = std::max(max_z, object_scan.cloud_ptr->points_[id].z());
+        }
+
+        double lengthBox = max_x - min_x;
+        double widthBox = max_y - min_y;
+        double heightBox = max_z - min_z;
+        box.header.stamp = current_time;
+        box.header.frame_id = "/velo_link";
+        box.label = label.first;
+        Eigen::Vector3d box_in_map(min_x + lengthBox / 2.0, min_y + widthBox / 2.0, min_z + heightBox / 2.0);
+        box.pose.position.x = box_in_map.x();
+        box.pose.position.y = box_in_map.y();
+        box.pose.position.z = box_in_map.z();
+
+        box.dimensions.x = ((lengthBox < 0) ? -1 * lengthBox : lengthBox);
+        box.dimensions.y = ((widthBox < 0) ? -1 * widthBox : widthBox);
+        box.dimensions.z = ((heightBox < 0) ? -1 * heightBox : heightBox);
+
+        boxInfo.emplace_back(box);
+    }
+
+    boxInfo.shrink_to_fit();
+    segmented_scan.cloud_ptr->points_.shrink_to_fit();
+    segmented_scan.cloud_ptr->intensity_.shrink_to_fit();
 
     return true;
 }
@@ -628,8 +709,15 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
 
 
         dcvc_relative.convertToPolar(laserCloudIn); //1、将坐标系转为球坐标系下
-        //dcvc_relative.createHashTable();//2、建立哈希表
-        //dcvc_relative.DCVC(dcvc_relative.labelInfo);//3、动态体素滤波
+        dcvc_relative.createHashTable();//2、建立哈希表
+        if(!dcvc_relative.DCVC(dcvc_relative.labelInfo)){//3、动态体素滤波
+            ROS_ERROR("DCVC算法启用失败！请检查错误");
+            return;
+        };
+        dcvc_relative.labelAnalysis(dcvc_relative.labelInfo);//4、标签分析   将同一标签的小数量点集合滤掉  只保留大标签
+        dcvc_relative.colorSegmentation();//5、建立每个类别的边界框
+
+
     }
 
     // 开始计算曲率
