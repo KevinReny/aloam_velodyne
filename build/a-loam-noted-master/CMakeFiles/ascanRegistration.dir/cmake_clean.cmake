@@ -2,6 +2,7 @@ file(REMOVE_RECURSE
   "/home/ren/catkin_ws/catkin_aloam/devel/lib/aloam_velodyne/ascanRegistration"
   "/home/ren/catkin_ws/catkin_aloam/devel/lib/aloam_velodyne/ascanRegistration.pdb"
   "CMakeFiles/ascanRegistration.dir/src/scanRegistration.cpp.o"
+  "CMakeFiles/ascanRegistration.dir/src/scanRegistration.cpp.o.d"
 )
 
 # Per-language clean rules from dependency scanning.

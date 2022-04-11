@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(aloam_velodyne)
 
-set(CMAKE_BUILD_TYPE "Release")
+set(CMAKE_BUILD_TYPE "Debug")
 set(CMAKE_CXX_FLAGS "-std=c++14")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -Wall -g")
+set(catkin_DIR /opt/ros/noetic/share/catkin/cmake) #DIR后面是catkinconfig路径
 
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
@@ -17,11 +19,13 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   tf
 )
+link_libraries(    yaml-cpp)
 
 #find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Ceres REQUIRED)
+find_package(yaml-cpp REQUIRED QUIET)
 
 include_directories(
   include
@@ -43,12 +47,11 @@ target_link_libraries(ascanRegistration ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 add_executable(alaserOdometry src/laserOdometry.cpp)
 target_link_libraries(alaserOdometry ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES})
 
-add_executable(alaserMapping src/laserMapping.cpp)
+add_executable(alaserMapping src/laserMapping.cpp include/aloam_velodyne/enhanced.h config/config.yaml)
 target_link_libraries(alaserMapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${CERES_LIBRARIES})
 
 add_executable(kittiHelper src/kittiHelper.cpp)
 target_link_libraries(kittiHelper ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBS})
-
 
 
 

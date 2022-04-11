@@ -186,6 +186,14 @@ void laserCloudFullResHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloud
     mBuf.unlock();
 }
 
+//receive all ground cloud
+void laserGroundPointsHandler(const sensor_msgs::PointCloud2ConstPtr &laserGroundPoints)
+{
+    mBuf.lock();
+    fullPointsBuf.push(laserGroundPoints);
+    mBuf.unlock();
+}
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "laserOdometry");
@@ -204,6 +212,8 @@ int main(int argc, char **argv)
     ros::Subscriber subSurfPointsLessFlat = nh.subscribe<sensor_msgs::PointCloud2>("/laser_cloud_less_flat", 100, laserCloudLessFlatHandler);
 
     ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_cloud_2", 100, laserCloudFullResHandler);
+
+  //  ros::Subscriber subGroundPoints = nh.subscribe<sensor_msgs::PointCloud2>("/laser_cloud_ground", 100, laserGroundPointsHandler);
 
     ros::Publisher pubLaserCloudCornerLast = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_corner_last", 100);
 
@@ -542,7 +552,7 @@ int main(int argc, char **argv)
             // 发布lidar里程记结果
             // publish odometry
             nav_msgs::Odometry laserOdometry;
-            laserOdometry.header.frame_id = "/camera_init";
+            laserOdometry.header.frame_id = "camera_init";
             laserOdometry.child_frame_id = "/laser_odom";
             laserOdometry.header.stamp = ros::Time().fromSec(timeSurfPointsLessFlat);
             // 以四元数和平移向量发出去
@@ -560,7 +570,7 @@ int main(int argc, char **argv)
             laserPose.pose = laserOdometry.pose.pose;
             laserPath.header.stamp = laserOdometry.header.stamp;
             laserPath.poses.push_back(laserPose);
-            laserPath.header.frame_id = "/camera_init";
+            laserPath.header.frame_id = "camera_init";
             pubLaserPath.publish(laserPath);
 
             // transform corner features and plane features to the scan end point

@@ -59,12 +59,12 @@ int main(int argc, char** argv)
 
     ros::Publisher pubOdomGT = n.advertise<nav_msgs::Odometry> ("/odometry_gt", 5);
     nav_msgs::Odometry odomGT;
-    odomGT.header.frame_id = "/camera_init";
+    odomGT.header.frame_id = "camera_init";
     odomGT.child_frame_id = "/ground_truth";
 
     ros::Publisher pubPathGT = n.advertise<nav_msgs::Path> ("/path_gt", 5);
     nav_msgs::Path pathGT;
-    pathGT.header.frame_id = "/camera_init";
+    pathGT.header.frame_id = "camera_init";
 
     std::string timestamp_path = "sequences/" + sequence_number + "/times.txt";
     std::ifstream timestamp_file(dataset_folder + timestamp_path, std::ifstream::in);
@@ -161,7 +161,7 @@ int main(int argc, char** argv)
         sensor_msgs::PointCloud2 laser_cloud_msg;
         pcl::toROSMsg(laser_cloud, laser_cloud_msg);
         laser_cloud_msg.header.stamp = ros::Time().fromSec(timestamp);
-        laser_cloud_msg.header.frame_id = "/camera_init";
+        laser_cloud_msg.header.frame_id = "camera_init";
         // 发布点云数据
         pub_laser_cloud.publish(laser_cloud_msg);
         // 图片也转成ros的消息发布出去
