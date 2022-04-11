@@ -1,6 +1,7 @@
 DCVC:
+    lidar_type: 16
     startR: 0.35    # Surface voxel initial polar diameter resolution
     deltaR: 0.0004  # Pole diameter increment
     deltaP: 1.2     # Pitch angle increment
     deltaA: 1.2     # Azimuth increment
-    minSeg: 80      # After splitting, how many points are at least one category, and categories smaller than this number will be filtered out
+    minSeg: 20      # After splitting, how many points are at least one category, and categories smaller than this number will be filtered out

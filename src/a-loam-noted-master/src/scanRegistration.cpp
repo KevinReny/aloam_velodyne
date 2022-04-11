@@ -167,6 +167,8 @@ void My_Create:: init_parameters(){
     dcvc_relative.deltaP = config_node["DCVC"]["deltaP"].as<double>();
     dcvc_relative.deltaA = config_node["DCVC"]["deltaA"].as<double>();
     dcvc_relative.minSeg = config_node["DCVC"]["minSeg"].as<int>();
+    //点云重置
+
 }
 
 void My_Create::reset_parameters(){
@@ -177,6 +179,25 @@ void My_Create::reset_parameters(){
             fullCloud[i][j] = nanPoint;
             fullCloud_type[i][j] = INVALID_POINT;//全部初始化为无效点
         }
+    //DCVC 部分
+    dcvc_relative.polarCor.clear(); //极坐标系坐标容器
+    dcvc_relative.voxelMap.clear();//体素滤波后的map
+    dcvc_relative.labelRecords.clear();//标签类别
+    dcvc_relative.boxInfo.clear();//包围盒信息
+    dcvc_relative.polarBounds.clear();//存储点云中的极径
+    dcvc_relative.labelInfo.clear();//标签信息，每个标签是一个聚类
+
+    dcvc_relative.minPitch=0.0; //动态体素的参数设置   [-15°，15°]
+    dcvc_relative.maxPitch=0.0;
+    dcvc_relative.minPolar=0.0;
+    dcvc_relative.maxPolar=0.0;
+    dcvc_relative.minAzi  =0.0;
+    dcvc_relative.maxAzi  =0.0;
+    dcvc_relative.width=0.0;
+    dcvc_relative.height=0.0;
+    dcvc_relative.polarNum=0.0;
+
+
 }
 int DCVC_Relative::getPolarIndex(double &radius) {
     for (auto r = 0; r < polarNum; ++r){
@@ -299,6 +320,8 @@ void DCVC_Relative::convertToPolar(pcl::PointCloud<pcl::PointXYZ> &cloud_in_) {
     }
 }
 
+
+
 bool DCVC_Relative ::DCVC(std::vector<int> &label_info) {
 
     int labelCount = 0;
@@ -411,52 +434,55 @@ void DCVC_Relative::labelAnalysis(std::vector<int> &label_info) {
     std::vector<std::pair<int, segInfo>>().swap(labelStatic);
 }
 
-bool DCVC_Relative::colorSegmentation() {
-    for (auto& label : labelRecords){
-        // box
-        jsk_recognition_msgs::BoundingBox box;
-        double min_x = std::numeric_limits<double>::max();//变量初始化
-        double max_x = -std::numeric_limits<double>::max();
-        double min_y = std::numeric_limits<double>::max();
-        double max_y = -std::numeric_limits<double>::max();
-        double min_z = std::numeric_limits<double>::max();
-        double max_z = -std::numeric_limits<double>::max();
+bool DCVC_Relative::colorSegmentation(pcl::PointCloud<pcl::PointXYZ> &cloudin) {
+    pcl::PointCloud<pcl::PointXYZ> cloud_temp;
+  for (auto& label : labelRecords){
+      // box
+      jsk_recognition_msgs::BoundingBox box;
+      float min_x = std::numeric_limits<double>::max();//变量初始化
+      float max_x = -std::numeric_limits<double>::max();
+      float min_y = std::numeric_limits<double>::max();
+      float max_y = -std::numeric_limits<double>::max();
+      float min_z = std::numeric_limits<double>::max();
+      float max_z = -std::numeric_limits<double>::max();
 
-        for (auto& id : label.second.index){//获取
-            segmented_scan.cloud_ptr->points_.emplace_back(object_scan.cloud_ptr->points_[id]);
-            segmented_scan.cloud_ptr->intensity_.emplace_back(object_scan.cloud_ptr->intensity_[id]);
-            //更新最大最小值
-            min_x = std::min(min_x, object_scan.cloud_ptr->points_[id].x());
-            max_x = std::max(max_x, object_scan.cloud_ptr->points_[id].x());
-            min_y = std::min(min_y, object_scan.cloud_ptr->points_[id].y());
-            max_y = std::max(max_y, object_scan.cloud_ptr->points_[id].y());
-            min_z = std::min(min_z, object_scan.cloud_ptr->points_[id].z());
-            max_z = std::max(max_z, object_scan.cloud_ptr->points_[id].z());
-        }
+      for (auto& id : label.second.index){//获取
+          cloud_temp.points.emplace_back(cloudin.points[id]);//关键找到哪个点云是有index索引的  应该原点云就有？
+            //在这里 删除掉了原tloam中的强度信息。
+          //更新最大最小值
+          min_x = std::min(min_x, cloudin.points[id].x);
+          max_x = std::max(max_x, cloudin.points[id].x);
+          min_y = std::min(min_y, cloudin.points[id].y);
+          max_y = std::max(max_y, cloudin.points[id].y);
+          min_z = std::min(min_z, cloudin.points[id].z);
+          max_z = std::max(max_z, cloudin.points[id].z);
+      }
 
-        double lengthBox = max_x - min_x;
-        double widthBox = max_y - min_y;
-        double heightBox = max_z - min_z;
-        box.header.stamp = current_time;
-        box.header.frame_id = "/velo_link";
-        box.label = label.first;
-        Eigen::Vector3d box_in_map(min_x + lengthBox / 2.0, min_y + widthBox / 2.0, min_z + heightBox / 2.0);
-        box.pose.position.x = box_in_map.x();
-        box.pose.position.y = box_in_map.y();
-        box.pose.position.z = box_in_map.z();
+      double lengthBox = max_x - min_x;
+      double widthBox = max_y - min_y;
+      double heightBox = max_z - min_z;
+//      box.header.stamp = current_time;
+//      box.header.frame_id = "/velo_link";
+      box.label = label.first;
+      Eigen::Vector3d box_in_map(min_x + lengthBox / 2.0, min_y + widthBox / 2.0, min_z + heightBox / 2.0);
+      box.pose.position.x = box_in_map.x();
+      box.pose.position.y = box_in_map.y();
+      box.pose.position.z = box_in_map.z();
 
-        box.dimensions.x = ((lengthBox < 0) ? -1 * lengthBox : lengthBox);
-        box.dimensions.y = ((widthBox < 0) ? -1 * widthBox : widthBox);
-        box.dimensions.z = ((heightBox < 0) ? -1 * heightBox : heightBox);
+      box.dimensions.x = ((lengthBox < 0) ? -1 * lengthBox : lengthBox);
+      box.dimensions.y = ((widthBox < 0) ? -1 * widthBox : widthBox);
+      box.dimensions.z = ((heightBox < 0) ? -1 * heightBox : heightBox);
 
-        boxInfo.emplace_back(box);
-    }
+      boxInfo.emplace_back(box);
+  }
 
-    boxInfo.shrink_to_fit();
-    segmented_scan.cloud_ptr->points_.shrink_to_fit();
-    segmented_scan.cloud_ptr->intensity_.shrink_to_fit();
+  boxInfo.shrink_to_fit();
+  ROS_INFO("经过滤波后，现在大小为%d 原来是%d，少了%d个",cloud_temp.size(),cloudin.size(),cloudin.size()-cloud_temp.size());
+  cloudin = cloud_temp;
+  cloud_temp.points.shrink_to_fit();
+  //segmented_scan.cloud_ptr->intensity_.shrink_to_fit();
 
-    return true;
+  return true;
 }
 
 
@@ -715,10 +741,115 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
             return;
         };
         dcvc_relative.labelAnalysis(dcvc_relative.labelInfo);//4、标签分析   将同一标签的小数量点集合滤掉  只保留大标签
-        dcvc_relative.colorSegmentation();//5、建立每个类别的边界框
+        dcvc_relative.colorSegmentation(laserCloudIn);//5、建立每个类别的边界框   ,同时更新laserCloud  删掉那些小的聚合类
 
+        //TODO:重新把lasercloudin存入laserscan  更新cloudsize  之后再考虑全点云的事情
+        for(auto &laser:laserCloudScans){//重置扫描线
+            laser.clear();
+        }
+        memset(fullCloud,UNKNOWD_POINT,sizeof (fullCloud)/sizeof (fullCloud[0][0]));//重置点云
+        for (int i = 0; i < laserCloudIn.size(); i++)
+        {
+            point.x = laserCloudIn.points[i].x;
+            point.y = laserCloudIn.points[i].y;
+            point.z = laserCloudIn.points[i].z;
+            // 计算他的俯仰角
+            float angle = atan(point.z / sqrt(point.x * point.x + point.y * point.y)) * 180 / M_PI;
+            int scanID = 0;//激光雷达行数
+            // 计算是第几根scan
+            if (N_SCANS == 16)
+            {
+                scanID = int((angle + 15) / 2 + 0.5);
+                if (scanID > (N_SCANS - 1) || scanID < 0)
+                {
+                    count--;
+                    continue;
+                }
+            }
+            else if (N_SCANS == 32)
+            {
+                scanID = int((angle + 92.0/3.0) * 3.0 / 4.0);
+                if (scanID > (N_SCANS - 1) || scanID < 0)
+                {
+                    count--;
+                    continue;
+                }
+            }
+            else if (N_SCANS == 64)
+            {
+                if (angle >= -8.83)
+                    scanID = int((2 - angle) * 3.0 + 0.5);
+                else
+                    scanID = N_SCANS / 2 + int((-8.83 - angle) * 2.0 + 0.5);
 
+                // use [0 50]  > 50 remove outlies
+                if (angle > 2 || angle < -24.33 || scanID > 50 || scanID < 0)
+                {
+                    count--;
+                    continue;
+                }
+            }
+            else
+            {
+                printf("wrong scan number\n");
+                ROS_BREAK();
+            }
+            //printf("angle %f scanID %d \n", angle, scanID);
+            // 计算水平角
+            float ori = -atan2(point.y, point.x);
+            if (!halfPassed)
+            {
+                // 确保-PI / 2 < ori - startOri < 3 / 2 * PI
+                if (ori < startOri - M_PI / 2)
+                {
+                    ori += 2 * M_PI;
+                }
+                else if (ori > startOri + M_PI * 3 / 2)
+                {
+                    ori -= 2 * M_PI;
+                }
+                // 如果超过180度，就说明过了一半了
+                if (ori - startOri > M_PI)
+                {
+                    halfPassed = true;
+                }
+            }
+            else
+            {
+                // 确保-PI * 3 / 2 < ori - endOri < PI / 2
+                ori += 2 * M_PI;    // 先补偿2PI
+                if (ori < endOri - M_PI * 3 / 2)
+                {
+                    ori += 2 * M_PI;
+                }
+                else if (ori > endOri + M_PI / 2)
+                {
+                    ori -= 2 * M_PI;
+                }
+            }
+            // 角度的计算是为了计算相对的起始时刻的时间
+            float relTime = (ori - startOri) / (endOri - startOri);
+            // 整数部分是scan的索引，小数部分是相对起始时刻的时间
+            point.intensity = scanID + scanPeriod * relTime;
+            // 根据scan的idx送入各自数组
+            if(scanID >= N_SCANS_SEG_G)//不是分离地面点的部分  可以直接存入lasercloud中。
+                laserCloudScans[scanID].push_back(point);
+            //否则先存入全点云
+            fullCloud[scanID][int(relTime*1800.0)]=point;//压入全点云中
+
+        }
+        cloudSize = laserCloudIn.size();
+        printf("删除滤波点以后的点云points size %d \n", cloudSize);
+        *laserCloud = laserCloudScans[0];
+        for (int i = 0; i < N_SCANS; i++)
+        {
+            scanStartInd[i] = laserCloud->size() + 5;
+            *laserCloud += laserCloudScans[i];
+            scanEndInd[i] = laserCloud->size() - 6;
+        }
+        ROS_INFO("lasercloud的大小为%d",laserCloud->size());
     }
+
 
     // 开始计算曲率
     for (int i = 5; i < cloudSize - 5; i++)

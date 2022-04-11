@@ -6,6 +6,8 @@
 #define ALOAM_VELODYNE_ENHANCED_H
 #include <unordered_map>
 #include <yaml-cpp/yaml.h>
+#include <jsk_recognition_msgs/BoundingBox.h>
+#include <jsk_recognition_msgs/BoundingBoxArray.h>
 class segInfo{
 public:
     int label{-1};
@@ -29,11 +31,20 @@ public:
 class DCVC_Relative:My_Create{
 public:
     bool DCVC(std::vector<int>& label_info);//label_info是指为点云中的第几个，即把点云分为很多个label
+    void labelAnalysis(std::vector<int> &label_info);//删除小部分样本聚类
+    bool colorSegmentation(pcl::PointCloud<pcl::PointXYZ> &cloudin);//通过体素滤波后重新存储点云
+    void searchKNN( int& polar_index,int& pitch_index,int& azimuth_index,std::vector<int>& out_neighIndex ) const;//寻找最近邻的体素
+    bool createHashTable();//哈希表的创建
+    int getPolarIndex(double &radius);//获取极坐标索引
+    void convertToPolar(pcl::PointCloud<pcl::PointXYZ> &cloud_in_);//（笛卡尔坐标-> 极坐标）
+
     std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> polarCor; //极坐标系坐标容器
     std::unordered_map<int, std::vector<int>> voxelMap{};//体素滤波后的map
-    std::vector<std::pair<int, segInfo>> labelRecords;
-    void labelAnalysis(std::vector<int> &label_info);
-    bool colorSegmentation();
+    std::vector<std::pair<int, segInfo>> labelRecords;//标签类别
+    std::vector<jsk_recognition_msgs::BoundingBox> boxInfo{};//包围盒信息
+    std::vector<double> polarBounds{};//存储点云中的极径
+    std::vector<int> labelInfo{};//标签信息，每个标签是一个聚类
+
     double minPitch{0.0}; //动态体素的参数设置   [-15°，15°]
     double maxPitch{0.0}; //动态体素的参数设置   [-15°，15°]
     double minPolar{5.0}; //动态体素的参数设置
@@ -48,19 +59,9 @@ public:
     int height{0};// 俯仰角方向上的栅格数
     int minSeg{0};
     int polarNum{0};//极坐标数
-    std::vector<double> polarBounds{};//存储点云中的极径
-    std::vector<int> labelInfo{};//标签信息，每个标签是一个聚类
 
-    void searchKNN(//寻找最近邻的体素
-            int& polar_index,
-            int& pitch_index,
-            int& azimuth_index,
-            std::vector<int>& out_neighIndex
-    ) const;
 
-    bool createHashTable();//哈希表的创建
-    int getPolarIndex(double &radius);//获取极坐标索引
-    void convertToPolar(pcl::PointCloud<pcl::PointXYZ> &cloud_in_);//（笛卡尔坐标-> 极坐标）
+
 
 private:
 
