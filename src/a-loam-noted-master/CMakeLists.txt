@@ -6,7 +6,7 @@ set(CMAKE_CXX_FLAGS "-std=c++14")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -Wall -g")
 set(catkin_DIR /opt/ros/noetic/share/catkin/cmake) #DIR后面是catkinconfig路径
-
+#提交看看
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   nav_msgs
